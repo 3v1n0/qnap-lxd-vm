@@ -10,6 +10,32 @@
 # wrapper shipped alongside drops those arguments, since LXD only uses SPICE for
 # its console (the guest agent runs over virtio-vsock).
 #
+# The ROMs QEMU loads at runtime (vgabios-virtio.bin for virtio-vga,
+# pxe-virtio.rom for virtio-net-pci, ...) are kept in an installed-style data
+# directory: QEMU searches <datadir>/<name> for BIOS files, so they sit flat,
+# with keymaps/ and dtb/ beside them. On QTS it would otherwise look in a data
+# directory that does not exist.
+#
+# ncurses-static and util-linux-static are link-time dependencies of a system
+# build: QEMU's text-mode display wants libncursesw.a, and glib's GIO (pulled in
+# by the system targets) wants libmount.a and libblkid.a.
+#
+# libfdt: QEMU 9.0 requires it for x86_64-softmmu (its microvm machine), unlike
+# 11.x where it can be disabled, so it is built from the dtc subproject that
+# meson fetches with git - the release tarball does not bundle it.
+#
+# libaio and libusb are what LXD's own QMP calls need: every VM disk is added
+# with aio=native (driver_qemu.go:3151), which only exists in a build with
+# linux-aio, and "lxc config device add ... usb" goes through QEMU's usb-host.
+# Configure would silently drop both, so they are requested explicitly.
+#
+# virtfs-proxy-helper is what LXD starts for a VM's 9p shares (a disk device
+# pointing at a host path). LXD prefers virtiofs and falls back to 9p, but
+# virtiofsd is a separate Rust project we do not ship, so the fallback is the
+# path that gets used; without this helper, starting such a device fails with
+# "Required binary \"virtfs-proxy-helper\" couldn't be found". It needs libcap-ng
+# and is deprecated upstream, but QEMU 9.0 still has it.
+#
 # Alpine + musl + --static: single files with no libraries to match on the NAS.
 ARG ALPINE=3.22
 FROM alpine:${ALPINE}
@@ -21,18 +47,25 @@ RUN apk add --no-cache \
         curl \
         file \
         gettext-static \
+        git \
         glib-dev \
         glib-static \
+        libaio-dev \
+        libcap-ng-dev \
+        libcap-ng-static \
         libseccomp-dev \
         libseccomp-static \
+        libusb-dev \
         linux-headers \
         meson \
+        ncurses-static \
         ninja \
         pcre2-static \
         pixman-dev \
         pixman-static \
         python3 \
         tar \
+        util-linux-static \
         xz \
         zlib-dev \
         zlib-static
@@ -50,14 +83,22 @@ RUN cd "qemu-${QEMU_VERSION}" \
         --target-list=x86_64-softmmu \
         --enable-tools \
         --enable-seccomp \
+        --enable-linux-aio \
+        --enable-libusb \
+        --enable-virtfs-proxy-helper \
         --disable-docs \
         --disable-guest-agent \
-    && ninja -C build qemu-img qemu-system-x86_64 \
+    && ninja -C build qemu-img qemu-system-x86_64 fsdev/virtfs-proxy-helper \
     && cp build/qemu-img /qemu-img \
     && cp build/qemu-system-x86_64 /qemu-system-x86_64 \
-    && for binary in /qemu-img /qemu-system-x86_64; do \
+    && cp build/fsdev/virtfs-proxy-helper /virtfs-proxy-helper \
+    && mkdir -p /qemu-datadir \
+    && cp -r build/pc-bios/. /qemu-datadir/ \
+    && cp -r pc-bios/. /qemu-datadir/ \
+    && for binary in /qemu-img /qemu-system-x86_64 /virtfs-proxy-helper; do \
            strip -s "$binary"; \
            file "$binary"; \
        done \
     && /qemu-img --version \
-    && /qemu-system-x86_64 --version
+    && /qemu-system-x86_64 --version \
+    && { /virtfs-proxy-helper 2>&1 | head -2; true; }

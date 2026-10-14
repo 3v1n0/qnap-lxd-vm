@@ -28,10 +28,16 @@ firmware="$REPO_DIR/build/firmware"
 [ -f "$firmware/OVMF_CODE.fd" ] || die "no firmware in $firmware (run scripts/20-fetch-ovmf.sh)"
 
 tools_dir="$REPO_DIR/build/bin"
-for tool in qemu-img prlimit nice; do
+for tool in qemu-img prlimit nice qemu-system-x86_64 virtfs-proxy-helper; do
     [ -x "$tools_dir/$tool" ] ||
         die "$tool is missing from $tools_dir (run scripts/25-make-tools.sh)"
 done
+
+wrapper="$REPO_DIR/nas/shared/qemu-wrapper.sh"
+[ -x "$wrapper" ] || die "missing $wrapper"
+
+datadir="$REPO_DIR/build/qemu-datadir"
+[ -d "$datadir" ] || die "no QEMU data directory in $datadir (run scripts/25-make-tools.sh)"
 
 out="$REPO_DIR/out"
 qpkg_root="$out/qpkg-src/QNAP_Vsock"
@@ -52,12 +58,21 @@ cp "$mods"/*.ko "$qpkg_root/shared/modules/$KERNEL_RELEASE/"
 mkdir -p "$qpkg_root/shared/firmware"
 cp -aL "$firmware"/*.fd "$qpkg_root/shared/firmware/"
 
-mkdir -p "$qpkg_root/shared/bin"
-cp "$tools_dir"/* "$qpkg_root/shared/bin/"
+# bin/ is what the helper links into LXD's PATH: the tools, and the wrapper as
+# qemu-system-x86_64. The real emulator stays in libexec/, out of PATH, so the
+# wrapper is what LXD finds.
+mkdir -p "$qpkg_root/shared/bin" "$qpkg_root/shared/libexec" \
+         "$qpkg_root/shared/share/qemu"
+for tool in qemu-img prlimit nice virtfs-proxy-helper; do
+    cp "$tools_dir/$tool" "$qpkg_root/shared/bin/"
+done
+cp "$wrapper" "$qpkg_root/shared/bin/qemu-system-x86_64"
+cp "$tools_dir/qemu-system-x86_64" "$qpkg_root/shared/libexec/"
+cp -r "$datadir"/* "$qpkg_root/shared/share/qemu/"
 
 chmod +x "$qpkg_root/shared/qnap-vsock.sh" \
          "$qpkg_root/shared/qnap-vsock-service.sh"
-chmod 755 "$qpkg_root/shared/bin/"*
+chmod 755 "$qpkg_root/shared/bin/"* "$qpkg_root/shared/libexec/"*
 
 if ! sudo podman image exists "$BUILD_IMAGE" 2>/dev/null; then
     die "container image $BUILD_IMAGE is missing (run scripts/10-make-modules.sh first)"
@@ -95,7 +110,8 @@ log "built $final ($(stat -c %s "$final") bytes)"
 stage="$out/tarball/qnap-vsock"
 rm -rf "$out/tarball"
 mkdir -p "$stage/shared" "$stage/autorun" \
-         "$stage/modules/$KERNEL_RELEASE" "$stage/firmware" "$stage/bin"
+         "$stage/modules/$KERNEL_RELEASE" "$stage/firmware" \
+         "$stage/bin" "$stage/libexec" "$stage/share/qemu"
 
 cp "$REPO_DIR/nas/install.sh" "$REPO_DIR/nas/uninstall.sh" "$stage/"
 cp "$REPO_DIR/nas/shared/qnap-vsock.sh" "$stage/shared/"
@@ -103,8 +119,13 @@ cp "$REPO_DIR/nas/autorun/autorun.sh" "$stage/autorun/"
 cp "$mods"/*.ko "$stage/modules/$KERNEL_RELEASE/"
 cp -aL "$firmware"/*.fd "$stage/firmware/"
 
-cp "$tools_dir"/* "$stage/bin/"
-chmod 755 "$stage/bin/"*
+for tool in qemu-img prlimit nice virtfs-proxy-helper; do
+    cp "$tools_dir/$tool" "$stage/bin/"
+done
+cp "$wrapper" "$stage/bin/qemu-system-x86_64"
+cp "$tools_dir/qemu-system-x86_64" "$stage/libexec/"
+cp -r "$datadir"/* "$stage/share/qemu/"
+chmod 755 "$stage/bin/"* "$stage/libexec/"*
 
 chmod +x "$stage/install.sh" "$stage/uninstall.sh" "$stage/shared/qnap-vsock.sh" "$stage/autorun/autorun.sh"
 
