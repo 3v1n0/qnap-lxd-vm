@@ -1,0 +1,6 @@
+# Download cache, extracted kernel tree and build scaffolding.
+build/
+
+# Build artifacts (rebuilt by ./build.sh).
+modules/
+out/
