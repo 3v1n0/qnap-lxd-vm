@@ -11,6 +11,9 @@ REPO_DIR=${REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}
 # derives it from uname -r, then cross-checks the two.
 QTS_GPL_DEFAULT=${QTS_GPL_DEFAULT:-5.2.3.20250218}
 KERNEL_MAJOR_DEFAULT=${KERNEL_MAJOR_DEFAULT:-5.10}
+# The model whose kernel_cfg configures the tree; the one the repository is
+# built and verified against, and a sensible default for other TS-x53 models.
+MODEL_DEFAULT=${MODEL_DEFAULT:-TS-X53II}
 
 log() { printf '==> %s\n' "$*" >&2; }
 warn() { printf '!!! %s\n' "$*" >&2; }
