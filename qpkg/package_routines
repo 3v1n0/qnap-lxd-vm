@@ -1,0 +1,74 @@
+######################################################################
+# Package routines for QNAP_Vsock.
+#
+# The modules, QEMU shim and UEFI firmware are all handled by the shared
+# helper in shared/qnap-vsock.sh, which the service program also calls.
+######################################################################
+
+QPKG_NAME="QNAP_Vsock"
+
+# QTS runs these routines with the package's paths in the environment. Only fall
+# back to the config file when they are not set: during an install, Install_Path
+# is not written to qpkg.conf until the install has finished, so reading it
+# there gives nothing and every path derived from it is wrong.
+QPKG_ROOT=${QPKG_ROOT:-${QPKG_DIR:-$(/sbin/getcfg "$QPKG_NAME" Install_Path -f /etc/config/qpkg.conf)}}
+
+# qbuild flattens shared/ into the package root, and while installing, the
+# working directory is the directory the files were extracted to, so the helper
+# is reachable relative to it as well.
+vsock_helper() {
+    for candidate in \
+        "$QPKG_ROOT/qnap-vsock.sh" \
+        "$QPKG_ROOT/shared/qnap-vsock.sh" \
+        ./qnap-vsock.sh \
+        ./shared/qnap-vsock.sh
+    do
+        if [ -x "$candidate" ]; then
+            printf '%s' "$candidate"
+            return 0
+        fi
+    done
+
+    printf '%s/qnap-vsock.sh' "$QPKG_ROOT"
+}
+
+pkg_pre_install() {
+    return 0
+}
+
+# Never fatal. Not finding the helper here just means the paths are not known
+# yet; the service program checks again when the package starts, which is where
+# it matters.
+pkg_install() {
+    if [ ! -x "$(vsock_helper)" ]; then
+        echo "qnap-vsock: helper not found while installing; it will be looked up when the package starts" >&2
+    fi
+
+    return 0
+}
+
+# Load the modules right away so VMs work without a reboot.
+#
+# This deliberately does not reorder anything: QTS decides QPKG start order from
+# the order of the sections in /etc/config/qpkg.conf, and moving ours would mean
+# rewriting that file. See the README for what that means in practice and for
+# the opt-in helper that does it if you want it.
+pkg_post_install() {
+    if ! QNAP_VSOCK_PREFIX="$QPKG_ROOT" "$(vsock_helper)" install; then
+        echo "qnap-vsock: failed to load vsock support, see /var/lib/qnap-vsock/qnap-vsock.log" >&2
+    fi
+
+    return 0
+}
+
+pkg_pre_remove() {
+    if [ -x "$(vsock_helper)" ]; then
+        QNAP_VSOCK_PREFIX="$QPKG_ROOT" "$(vsock_helper)" uninstall
+    fi
+
+    return 0
+}
+
+pkg_post_remove() {
+    return 0
+}
