@@ -28,9 +28,10 @@ firmware="$REPO_DIR/build/firmware"
 [ -f "$firmware/OVMF_CODE.fd" ] || die "no firmware in $firmware (run scripts/20-fetch-ovmf.sh)"
 
 tools_dir="$REPO_DIR/build/bin"
-if [ ! -x "$tools_dir/qemu-img" ] || [ ! -x "$tools_dir/prlimit" ]; then
-    die "the static tools are missing from $tools_dir (run scripts/25-make-tools.sh)"
-fi
+for tool in qemu-img prlimit nice; do
+    [ -x "$tools_dir/$tool" ] ||
+        die "$tool is missing from $tools_dir (run scripts/25-make-tools.sh)"
+done
 
 out="$REPO_DIR/out"
 qpkg_root="$out/qpkg-src/QNAP_Vsock"
