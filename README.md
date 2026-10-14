@@ -26,6 +26,12 @@ On QNAP's kernel none of the vsock code exists: there are no vsock symbols in
 `/lib/modules/$(uname -r)`. `vhost.ko`, `vhost_iotlb.ko` and `vhost_net.ko` are
 present, so only the vsock stack is missing.
 
+None of that is the whole story: LXD 5.0.2, Container Station's QEMU, the 5.10
+kernel and QTS 5.2 each disagree with the next in ways that surface one failing
+`lxc` command at a time. Every one of them — with the message it produces, the
+cause and what handles it — is written up in
+[docs/compatibility.md](docs/compatibility.md).
+
 Three more things LXD needs are also missing on a stock Container Station:
 `qemu-system-x86_64` is not on the LXD daemon's `PATH` (the only QEMU is a
 kata-static build under Container Station's own prefix), there is no UEFI
@@ -540,6 +546,8 @@ nas/                     everything that ships to the NAS
   install.sh             tarball path
   autorun/autorun.sh     boot hook body for the tarball path
 qpkg/                    QPKG source (qbuild packages this)
+docs/                    compatibility.md: every LXD 5.0.2 / QEMU / kernel /
+                         QTS 5.2 disagreement, and how it is handled
 tests/                   local checks, no NAS needed
   qemu-config-check.sh   run the built emulator against an LXD-generated
                          qemu.conf to catch missing devices or ROMs
