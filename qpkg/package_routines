@@ -51,7 +51,7 @@ pkg_install() {
 #
 # This deliberately does not reorder anything: QTS decides QPKG start order from
 # the order of the sections in /etc/config/qpkg.conf, and moving ours would mean
-# rewriting that file. See the README for what that means in practice and for
+# rewriting that file. See AGENTS.md for what that means in practice and for
 # the opt-in helper that does it if you want it.
 pkg_post_install() {
     if ! QNAP_LXD_VM_PREFIX="$QPKG_ROOT" "$(vm_helper)" install; then

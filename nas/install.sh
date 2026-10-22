@@ -10,7 +10,7 @@
 #
 # It loads the modules, installs the QEMU shim and the UEFI firmware, and
 # restarts Container Station's LXD daemon only if nothing is running. See
-# README.md for how to make it survive a reboot.
+# AGENTS.md for how to make it survive a reboot.
 set -eu
 
 PREFIX=$(cd "$(dirname "$0")" && pwd)
@@ -41,4 +41,4 @@ echo
 echo
 echo "Next: 'lxc info' should no longer report missing vsock support."
 echo "To keep this across reboots install the QPKG (nas/qpkg) or wire up"
-echo "nas/autorun/autorun.sh; see README.md."
+echo "nas/autorun/autorun.sh; see AGENTS.md."

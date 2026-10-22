@@ -5,7 +5,7 @@
 # QNAP runs a user script named autorun.sh at boot; where it lives depends on
 # the firmware. This script is the body to use: it is idempotent, so wiring it
 # into QNAP's autorun mechanism, a scheduled task on boot, or your own init
-# script all work. See README.md for the options.
+# script all work. See AGENTS.md for the options.
 #
 # It loads the modules and, as with every other entry point here, only restarts
 # LXD when nothing is running.
