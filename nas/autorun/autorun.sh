@@ -11,21 +11,21 @@
 # LXD when nothing is running.
 set -u
 
-STATE_DIR=${QNAP_VSOCK_STATE:-/var/lib/qnap-vsock}
-PREFIX=${QNAP_VSOCK_PREFIX:-}
+STATE_DIR=${QNAP_LXD_VM_STATE:-/var/lib/qnap-lxd-vm}
+PREFIX=${QNAP_LXD_VM_PREFIX:-}
 
 if [ -z "$PREFIX" ] && [ -f "$STATE_DIR/prefix" ]; then
     PREFIX=$(cat "$STATE_DIR/prefix")
 fi
-if [ -z "$PREFIX" ] || [ ! -x "$PREFIX/shared/qnap-vsock.sh" ]; then
-    for PREFIX in /share/*/.qpkg/QNAP_Vsock /share/*/qnap-vsock; do
-        [ -x "$PREFIX/shared/qnap-vsock.sh" ] && break
+if [ -z "$PREFIX" ] || [ ! -x "$PREFIX/shared/qnap-lxd-vm.sh" ]; then
+    for PREFIX in /share/*/.qpkg/QNAP_LXD_VM /share/*/qnap-lxd-vm; do
+        [ -x "$PREFIX/shared/qnap-lxd-vm.sh" ] && break
     done
 fi
 
-if [ ! -x "$PREFIX/shared/qnap-vsock.sh" ]; then
-    echo "autorun: cannot find the qnap-vsock payload (set QNAP_VSOCK_PREFIX)" >&2
+if [ ! -x "$PREFIX/shared/qnap-lxd-vm.sh" ]; then
+    echo "autorun: cannot find the qnap-lxd-vm payload (set QNAP_LXD_VM_PREFIX)" >&2
     exit 1
 fi
 
-exec "$PREFIX/shared/qnap-vsock.sh" install
+exec "$PREFIX/shared/qnap-lxd-vm.sh" install

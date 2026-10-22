@@ -34,8 +34,8 @@ check_syntax() {
     done
     # The NAS side must stay POSIX sh: QNAP's /bin/sh is not bash.
     for f in "$REPO_DIR"/nas/install.sh "$REPO_DIR"/nas/uninstall.sh \
-             "$REPO_DIR"/nas/autorun/autorun.sh "$REPO_DIR"/nas/shared/qnap-vsock.sh \
-             "$REPO_DIR"/qpkg/package_routines "$REPO_DIR"/qpkg/shared/qnap-vsock-service.sh; do
+             "$REPO_DIR"/nas/autorun/autorun.sh "$REPO_DIR"/nas/shared/qnap-lxd-vm.sh \
+             "$REPO_DIR"/qpkg/package_routines "$REPO_DIR"/qpkg/shared/qnap-lxd-vm-service.sh; do
         [ -f "$f" ] || continue
         check "syntax: ${f#"$REPO_DIR"/} (sh)" sh -n "$f"
     done
@@ -110,7 +110,7 @@ if m:
     size = min(size, int(m.group(1)))
 tar = tarfile.open(fileobj=io.BytesIO(gzip.decompress(data[start:start+size])), mode='r:')
 names = set(n.lstrip('./') for n in tar.getnames())
-required = {'qnap-vsock-service.sh', 'qnap-vsock.sh', 'modules', 'firmware',
+required = {'qnap-lxd-vm-service.sh', 'qnap-lxd-vm.sh', 'modules', 'firmware',
             'bin/qemu-img', 'bin/prlimit', 'bin/qemu-system-x86_64',
             'bin/virtfs-proxy-helper',
             'libexec/qemu-system-x86_64', 'share/qemu'}
@@ -130,7 +130,7 @@ PY
 
 check_tarball() {
     local tb
-    tb=$(ls "$REPO_DIR"/out/qnap-vsock-*.tar.gz 2>/dev/null)
+    tb=$(ls "$REPO_DIR"/out/qnap-lxd-vm-*.tar.gz 2>/dev/null)
     tb=${tb%%$'\n'*}
     [ -n "$tb" ] || { no "tarball built"; return; }
     ok "tarball built: $(basename "$tb")"
@@ -138,39 +138,39 @@ check_tarball() {
     local list
     list=$(tar -tzf "$tb")
     case "$list" in
-        *"qnap-vsock/install.sh"*) ok "tarball has install.sh" ;;
+        *"qnap-lxd-vm/install.sh"*) ok "tarball has install.sh" ;;
         *) no "tarball has install.sh" ;;
     esac
     case "$list" in
-        *"qnap-vsock/shared/qnap-vsock.sh"*) ok "tarball has the helper" ;;
+        *"qnap-lxd-vm/shared/qnap-lxd-vm.sh"*) ok "tarball has the helper" ;;
         *) no "tarball has the helper" ;;
     esac
     case "$list" in
-        *"qnap-vsock/modules/"*) ok "tarball has modules" ;;
+        *"qnap-lxd-vm/modules/"*) ok "tarball has modules" ;;
         *) no "tarball has modules" ;;
     esac
     case "$list" in
-        *"qnap-vsock/bin/qemu-img"*) ok "tarball has qemu-img" ;;
+        *"qnap-lxd-vm/bin/qemu-img"*) ok "tarball has qemu-img" ;;
         *) no "tarball has qemu-img" ;;
     esac
     case "$list" in
-        *"qnap-vsock/bin/prlimit"*) ok "tarball has prlimit" ;;
+        *"qnap-lxd-vm/bin/prlimit"*) ok "tarball has prlimit" ;;
         *) no "tarball has prlimit" ;;
     esac
     case "$list" in
-        *"qnap-vsock/libexec/qemu-system-x86_64"*) ok "tarball has the emulator" ;;
+        *"qnap-lxd-vm/libexec/qemu-system-x86_64"*) ok "tarball has the emulator" ;;
         *) no "tarball has the emulator" ;;
     esac
     case "$list" in
-        *"qnap-vsock/bin/virtfs-proxy-helper"*) ok "tarball has virtfs-proxy-helper" ;;
+        *"qnap-lxd-vm/bin/virtfs-proxy-helper"*) ok "tarball has virtfs-proxy-helper" ;;
         *) no "tarball has virtfs-proxy-helper" ;;
     esac
     case "$list" in
-        *"qnap-vsock/share/qemu/vgabios"*) ok "tarball has the option ROMs" ;;
+        *"qnap-lxd-vm/share/qemu/vgabios"*) ok "tarball has the option ROMs" ;;
         *) no "tarball has the option ROMs" ;;
     esac
     case "$list" in
-        *"qnap-vsock/firmware/OVMF_CODE.fd"*) ok "tarball has firmware" ;;
+        *"qnap-lxd-vm/firmware/OVMF_CODE.fd"*) ok "tarball has firmware" ;;
         *) no "tarball has firmware" ;;
     esac
 }
@@ -183,16 +183,16 @@ check_helper_prefix() {
     for layout in tarball flattened; do
         dir="$TMP/$layout"
         mkdir -p "$dir/shared"
-        cp "$REPO_DIR/nas/shared/qnap-vsock.sh" "$dir/shared/qnap-vsock.sh"
+        cp "$REPO_DIR/nas/shared/qnap-lxd-vm.sh" "$dir/shared/qnap-lxd-vm.sh"
         mkdir -p "$dir/modules/$(uname -r)"
         : > "$dir/modules/$(uname -r)/vsock.ko"
         if [ "$layout" = flattened ]; then
             # simulate the installed QPKG: helper at the root
-            mv "$dir/shared/qnap-vsock.sh" "$dir/qnap-vsock.sh"
+            mv "$dir/shared/qnap-lxd-vm.sh" "$dir/qnap-lxd-vm.sh"
             rmdir "$dir/shared"
-            script="$dir/qnap-vsock.sh"
+            script="$dir/qnap-lxd-vm.sh"
         else
-            script="$dir/shared/qnap-vsock.sh"
+            script="$dir/shared/qnap-lxd-vm.sh"
         fi
         # Capture first: piping into grep -q would kill the helper with SIGPIPE
         # and, with pipefail, fail the pipeline even on a match.
@@ -209,7 +209,7 @@ check_helper_rejects_foreign_module() {
     local dir ko out
     dir="$TMP/foreign"
     mkdir -p "$dir/shared"
-    cp "$REPO_DIR/nas/shared/qnap-vsock.sh" "$dir/shared/qnap-vsock.sh"
+    cp "$REPO_DIR/nas/shared/qnap-lxd-vm.sh" "$dir/shared/qnap-lxd-vm.sh"
 
     ko=$(modules_dir)/vsock.ko
     if [ ! -f "$ko" ]; then
@@ -217,8 +217,8 @@ check_helper_rejects_foreign_module() {
         return
     fi
 
-    out=$(QNAP_VSOCK_STATE="$TMP/state" \
-          sh "$dir/shared/qnap-vsock.sh" check-file "$ko" 2>&1)
+    out=$(QNAP_LXD_VM_STATE="$TMP/state" \
+          sh "$dir/shared/qnap-lxd-vm.sh" check-file "$ko" 2>&1)
     if [ $? != 0 ] && printf '%s' "$out" | grep -qiE 'vermagic|not for'; then
         ok "helper refuses a module built for another kernel"
     else
@@ -231,9 +231,9 @@ check_helper_preflight() {
     local dir out rc
     dir="$TMP/preflight"
     mkdir -p "$dir/shared" "$dir/modules/$(uname -r)"
-    cp "$REPO_DIR/nas/shared/qnap-vsock.sh" "$dir/shared/qnap-vsock.sh"
+    cp "$REPO_DIR/nas/shared/qnap-lxd-vm.sh" "$dir/shared/qnap-lxd-vm.sh"
 
-    out=$(QNAP_VSOCK_STATE="$TMP/state" sh "$dir/shared/qnap-vsock.sh" preflight 2>&1)
+    out=$(QNAP_LXD_VM_STATE="$TMP/state" sh "$dir/shared/qnap-lxd-vm.sh" preflight 2>&1)
     rc=$?
     [ "$rc" = 0 ] && ok "preflight exits 0" || no "preflight exits 0"
     case "$out" in
@@ -256,8 +256,8 @@ check_helper_preflight() {
 # we only check the underlying start-time helper orders two known processes.
 check_process_start_order() {
     local one two
-    one=$(QNAP_VSOCK_STATE="$TMP/state" sh "$REPO_DIR/nas/shared/qnap-vsock.sh" process-start 1 2>/dev/null)
-    two=$(QNAP_VSOCK_STATE="$TMP/state" sh "$REPO_DIR/nas/shared/qnap-vsock.sh" process-start $$ 2>/dev/null)
+    one=$(QNAP_LXD_VM_STATE="$TMP/state" sh "$REPO_DIR/nas/shared/qnap-lxd-vm.sh" process-start 1 2>/dev/null)
+    two=$(QNAP_LXD_VM_STATE="$TMP/state" sh "$REPO_DIR/nas/shared/qnap-lxd-vm.sh" process-start $$ 2>/dev/null)
     if [ -n "$one" ] && [ -n "$two" ] && [ "$one" -lt "$two" ]; then
         ok "process-start orders pid 1 before this shell"
     else
@@ -312,7 +312,7 @@ check_qemu_img_binary() {
 # The install routines must not fail an install because they cannot locate the
 # helper: during an install, Install_Path is not in qpkg.conf yet, so the paths
 # derived from it are empty, and the routines run from the directory the files
-# were extracted to. Failing there made App Center report "qnap-vsock helper is
+# were extracted to. Failing there made App Center report "qnap-lxd-vm helper is
 # missing from the package" and abort the install.
 check_qpkg_install_routines() {
     local routines="$REPO_DIR/qpkg/package_routines" work
@@ -327,11 +327,11 @@ check_qpkg_install_routines() {
     ok "qpkg install routines present"
 
     # As during an install: the helper sits next to the extracted files.
-    : > "$work/qnap-vsock.sh"
-    chmod 755 "$work/qnap-vsock.sh"
+    : > "$work/qnap-lxd-vm.sh"
+    chmod 755 "$work/qnap-lxd-vm.sh"
     if (cd "$work" && QPKG_ROOT=/nonexistent sh -c '
             . "$1"
-            [ "$(vsock_helper)" = "./qnap-vsock.sh" ] || exit 2
+            [ "$(vm_helper)" = "./qnap-lxd-vm.sh" ] || exit 2
             pkg_install
         ' sh "$routines") >/dev/null 2>&1; then
         ok "install routine finds the helper beside the extracted files"
@@ -340,7 +340,7 @@ check_qpkg_install_routines() {
     fi
 
     # And it must stay successful when nothing can be found at all.
-    rm -f "$work/qnap-vsock.sh"
+    rm -f "$work/qnap-lxd-vm.sh"
     if (cd "$work" && QPKG_ROOT=/nonexistent sh -c '. "$1"; pkg_install' sh "$routines") >/dev/null 2>&1; then
         ok "install routine succeeds even without a helper"
     else
@@ -586,15 +586,15 @@ check_tools_shim() {
 
     dir="$TMP/tools/prefix"; bindir="$TMP/tools/bin"
     mkdir -p "$dir/shared" "$dir/modules/$(uname -r)" "$dir/bin" "$bindir"
-    cp "$REPO_DIR/nas/shared/qnap-vsock.sh" "$dir/shared/qnap-vsock.sh"
+    cp "$REPO_DIR/nas/shared/qnap-lxd-vm.sh" "$dir/shared/qnap-lxd-vm.sh"
     printf '#!/bin/sh\necho test-tool\n' > "$dir/bin/qemu-img"
-    printf '#!/bin/sh\necho test-tool\n' > "$dir/bin/qnap-vsock-fake-tool"
-    chmod 755 "$dir/bin/qemu-img" "$dir/bin/qnap-vsock-fake-tool"
+    printf '#!/bin/sh\necho test-tool\n' > "$dir/bin/qnap-lxd-vm-fake-tool"
+    chmod 755 "$dir/bin/qemu-img" "$dir/bin/qnap-lxd-vm-fake-tool"
 
-    QNAP_VSOCK_STATE="$TMP/tools/state" QNAP_VSOCK_BIN_DIR="$bindir" \
-        sh "$dir/shared/qnap-vsock.sh" shim >/dev/null 2>&1
+    QNAP_LXD_VM_STATE="$TMP/tools/state" QNAP_LXD_VM_BIN_DIR="$bindir" \
+        sh "$dir/shared/qnap-lxd-vm.sh" shim >/dev/null 2>&1
 
-    for tool in qemu-img qnap-vsock-fake-tool; do
+    for tool in qemu-img qnap-lxd-vm-fake-tool; do
         if [ -L "$bindir/$tool" ] && [ "$(readlink "$bindir/$tool")" = "$dir/bin/$tool" ]; then
             ok "$tool is linked into LXD's PATH"
         else
@@ -608,9 +608,9 @@ check_tools_shim() {
         no "the linked tools run"
     fi
 
-    QNAP_VSOCK_STATE="$TMP/tools/state" QNAP_VSOCK_BIN_DIR="$bindir" \
-        sh "$dir/shared/qnap-vsock.sh" uninstall >/dev/null 2>&1
-    if [ ! -e "$bindir/qemu-img" ] && [ ! -e "$bindir/qnap-vsock-fake-tool" ]; then
+    QNAP_LXD_VM_STATE="$TMP/tools/state" QNAP_LXD_VM_BIN_DIR="$bindir" \
+        sh "$dir/shared/qnap-lxd-vm.sh" uninstall >/dev/null 2>&1
+    if [ ! -e "$bindir/qemu-img" ] && [ ! -e "$bindir/qnap-lxd-vm-fake-tool" ]; then
         ok "uninstall removes the tool links"
     else
         no "uninstall removes the tool links"
@@ -623,13 +623,13 @@ check_firmware_links() {
     local dir vdir bindir
     dir="$TMP/fw/prefix"; vdir="$TMP/fw/ovmf"; bindir="$TMP/fw/bin"
     mkdir -p "$dir/shared" "$dir/firmware" "$dir/modules/$(uname -r)" "$vdir" "$bindir"
-    cp "$REPO_DIR/nas/shared/qnap-vsock.sh" "$dir/shared/qnap-vsock.sh"
+    cp "$REPO_DIR/nas/shared/qnap-lxd-vm.sh" "$dir/shared/qnap-lxd-vm.sh"
     : > "$dir/firmware/OVMF_CODE.fd"
     : > "$dir/firmware/OVMF_VARS.fd"
 
-    if ! QNAP_VSOCK_STATE="$TMP/fw/state" LXD_OVMF_PATH="$vdir" \
-         QNAP_VSOCK_BIN_DIR="$bindir" \
-         sh "$dir/shared/qnap-vsock.sh" firmware >/dev/null 2>&1; then
+    if ! QNAP_LXD_VM_STATE="$TMP/fw/state" LXD_OVMF_PATH="$vdir" \
+         QNAP_LXD_VM_BIN_DIR="$bindir" \
+         sh "$dir/shared/qnap-lxd-vm.sh" firmware >/dev/null 2>&1; then
         no "firmware action runs"
         return
     fi
@@ -642,9 +642,9 @@ check_firmware_links() {
         no "firmware is linked, not copied"
     fi
 
-    QNAP_VSOCK_STATE="$TMP/fw/state" LXD_OVMF_PATH="$vdir" \
-        QNAP_VSOCK_BIN_DIR="$bindir" \
-        sh "$dir/shared/qnap-vsock.sh" uninstall >/dev/null 2>&1
+    QNAP_LXD_VM_STATE="$TMP/fw/state" LXD_OVMF_PATH="$vdir" \
+        QNAP_LXD_VM_BIN_DIR="$bindir" \
+        sh "$dir/shared/qnap-lxd-vm.sh" uninstall >/dev/null 2>&1
     if [ ! -e "$vdir/OVMF_CODE.fd" ] && [ ! -e "$vdir/OVMF_VARS.fd" ]; then
         ok "uninstall removes the firmware links"
     else

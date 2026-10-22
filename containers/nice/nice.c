@@ -42,7 +42,7 @@ int main(int argc, char **argv)
     int i = 1;
 
     if (i < argc && strcmp(argv[i], "--version") == 0) {
-        printf("nice (qnap-vsock) 1.0\n");
+        printf("nice (qnap-lxd-vm) 1.0\n");
         return 0;
     }
 

@@ -121,7 +121,7 @@ int main(int argc, char **argv)
         size_t length;
 
         if (strcmp(arg, "--version") == 0) {
-            printf("prlimit (qnap-vsock) 1.0\n");
+            printf("prlimit (qnap-lxd-vm) 1.0\n");
             return 0;
         }
 

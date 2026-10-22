@@ -1,12 +1,14 @@
-# qnap-vsock
+# qnap-lxd-vm
 
-Makes Container Station's LXD able to run virtual machines on a QNAP NAS whose
-kernel has vsock support compiled out.
+Runs LXD virtual machines on a QNAP NAS: makes Container Station's LXD able to
+create and start `--vm` instances, which it cannot do out of the box because
+QNAP's kernel is built without the vsock stack, and Container Station ships
+neither a usable QEMU, nor `qemu-img`, nor UEFI firmware.
 
 Built and verified against a **TS-X53II running QTS 5.2.10 (kernel
 5.10.60-qnap)**, but nothing here is specific to that model or firmware.
 
-## The problem
+## Why a stock NAS cannot
 
 `lxc init ... --vm` fails with:
 
@@ -167,8 +169,8 @@ MODEL=TS-X53II ./build.sh all   # pick the model whose kernel config to use
 Artifacts land in `out/`:
 
 ```
-out/QNAP_Vsock_1.0.0.qpkg
-out/qnap-vsock-5.10.60-qnap.tar.gz
+out/QNAP_LXD_VM_1.0.0.qpkg
+out/qnap-lxd-vm-5.10.60-qnap.tar.gz
 ```
 
 Run the local checks (script syntax, module vermagic, both payload layouts, the
@@ -210,6 +212,10 @@ Notes on the build:
 
 ### QPKG (recommended)
 
+If the previous `QNAP_Vsock` package is installed, remove it first (`sudo
+/sbin/qpkg_cli -R QNAP_Vsock`) — this package has a different name, so QTS
+installs both rather than replacing it.
+
 Copy it to a share and run the installer. A `.qpkg` is a self-extracting
 installer — `qbuild` puts a small shell header in front of the package, and that
 header works out which volume to install into, extracts the payload and runs
@@ -217,9 +223,9 @@ QNAP's own `qinstall.sh` — so running it as root installs it, and that is also
 how you get its output on the console:
 
 ```sh
-scp out/QNAP_Vsock_1.0.0.qpkg admin@nas:/share/Public/
+scp out/QNAP_LXD_VM_1.0.0.qpkg admin@nas:/share/Public/
 ssh admin@nas
-sudo sh /share/Public/QNAP_Vsock_1.0.0.qpkg
+sudo sh /share/Public/QNAP_LXD_VM_1.0.0.qpkg
 ```
 
 Install it from a share rather than `/tmp`: the installer creates the package
@@ -229,9 +235,9 @@ In App Center you can instead use *Install Manually* and pick the file
 ([QNAP's procedure](https://www.qnap.com/en/how-to/faq/article/how-to-install-qnap-applications-qpkg-files-manually)).
 
 `qpkg_cli` is how you control and inspect it afterwards: `--enable`, `--disable`,
-`--stop`, `--start`, `-s` (status) and `-R QNAP_Vsock` (remove). If it ends up
+`--stop`, `--start`, `-s` (status) and `-R QNAP_LXD_VM` (remove). If it ends up
 disabled after installing it this way, `sudo /sbin/qpkg_cli --enable
-QNAP_Vsock` starts it.
+QNAP_LXD_VM` starts it.
 
 The package loads the modules and links the QEMU, qemu-img,
 virtfs-proxy-helper and firmware files into place, and does the same on every
@@ -249,10 +255,10 @@ for why, and for how to make the package start earlier if you would rather not.
 ### Plain tarball
 
 ```sh
-scp out/qnap-vsock-5.10.60-qnap.tar.gz admin@nas:/share/Public/
+scp out/qnap-lxd-vm-5.10.60-qnap.tar.gz admin@nas:/share/Public/
 ssh admin@nas
-cd /share/Public && tar xzf qnap-vsock-5.10.60-qnap.tar.gz
-cd qnap-vsock && sudo ./install.sh
+cd /share/Public && tar xzf qnap-lxd-vm-5.10.60-qnap.tar.gz
+cd qnap-lxd-vm && sudo ./install.sh
 ```
 
 `install.sh` does not persist by itself. For that, wire `autorun/autorun.sh`
@@ -299,10 +305,10 @@ Diagnostics and logs:
 
 ```sh
 # everything LXD checks, plus whether the running daemon holds a stale answer
-sudo /share/*/.qpkg/QNAP_Vsock/qnap-vsock.sh preflight
-sudo /share/*/.qpkg/QNAP_Vsock/qnap-vsock.sh status    # or nas/shared/qnap-vsock.sh
-cat /var/lib/qnap-vsock/qnap-vsock.log
-/sbin/getcfg QNAP_Vsock Install_Path -f /etc/config/qpkg.conf
+sudo /share/*/.qpkg/QNAP_LXD_VM/qnap-lxd-vm.sh preflight
+sudo /share/*/.qpkg/QNAP_LXD_VM/qnap-lxd-vm.sh status    # or nas/shared/qnap-lxd-vm.sh
+cat /var/lib/qnap-lxd-vm/qnap-lxd-vm.log
+/sbin/getcfg QNAP_LXD_VM Install_Path -f /etc/config/qpkg.conf
 ```
 
 ## Console access to VMs
@@ -538,7 +544,7 @@ containers/              the Ubuntu 20.04 module/QPKG build image (with QNAP's
                          QDK) and the Alpine images that build the static tools
                          (QEMU, plus prlimit/ and nice/ from our own C)
 nas/                     everything that ships to the NAS
-  shared/qnap-vsock.sh   the only place that loads/verifies anything, and
+  shared/qnap-lxd-vm.sh   the only place that loads/verifies anything, and
                          the only place that links the tools into PATH;
                          used by both install paths
   shared/qemu-wrapper.sh the qemu-system-x86_64 LXD finds: drops the SPICE

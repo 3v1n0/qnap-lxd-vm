@@ -4,8 +4,8 @@
 #
 # Run this from the directory you unpacked the tarball into, as root:
 #
-#   tar xzf qnap-vsock-<release>.tar.gz
-#   cd qnap-vsock
+#   tar xzf qnap-lxd-vm-<release>.tar.gz
+#   cd qnap-lxd-vm
 #   ./install.sh
 #
 # It loads the modules, installs the QEMU shim and the UEFI firmware, and
@@ -14,7 +14,7 @@
 set -eu
 
 PREFIX=$(cd "$(dirname "$0")" && pwd)
-HELPER="$PREFIX/shared/qnap-vsock.sh"
+HELPER="$PREFIX/shared/qnap-lxd-vm.sh"
 KVER=$(uname -r)
 
 [ "$(id -u)" = 0 ] || { echo "run me as root" >&2; exit 1; }
@@ -29,7 +29,7 @@ if [ ! -d "$PREFIX/modules/$KVER" ]; then
 fi
 
 # Remember where the payload lives so a boot hook can find it.
-STATE_DIR=${QNAP_VSOCK_STATE:-/var/lib/qnap-vsock}
+STATE_DIR=${QNAP_LXD_VM_STATE:-/var/lib/qnap-lxd-vm}
 mkdir -p "$STATE_DIR"
 echo "$PREFIX" > "$STATE_DIR/prefix"
 

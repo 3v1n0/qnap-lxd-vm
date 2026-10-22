@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# QPKG service program for QNAP_Vsock.
+# QPKG service program for QNAP_LXD_VM.
 #
 # `start` is run by QTS at boot and when the package is enabled, and is the
 # only thing that has to happen: everything else lives in the shared helper.
@@ -8,16 +8,16 @@
 # `stop` deliberately leaves the modules loaded. Unloading vsock while LXD has
 # sockets open would break any running VM; disabling or removing the package is
 # the way to get rid of them.
-QPKG_NAME="QNAP_Vsock"
+QPKG_NAME="QNAP_LXD_VM"
 CONF=/etc/config/qpkg.conf
 QPKG_ROOT=$(/sbin/getcfg "$QPKG_NAME" Install_Path -f "$CONF")
 
 export QNAP_QPKG=$QPKG_NAME
-export QNAP_VSOCK_PREFIX=$QPKG_ROOT
+export QNAP_LXD_VM_PREFIX=$QPKG_ROOT
 
 # qbuild flattens shared/ into the package root, but accept either layout.
-HELPER="$QPKG_ROOT/qnap-vsock.sh"
-[ -x "$HELPER" ] || HELPER="$QPKG_ROOT/shared/qnap-vsock.sh"
+HELPER="$QPKG_ROOT/qnap-lxd-vm.sh"
+[ -x "$HELPER" ] || HELPER="$QPKG_ROOT/shared/qnap-lxd-vm.sh"
 
 case "$1" in
 start)

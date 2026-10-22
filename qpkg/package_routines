@@ -1,11 +1,11 @@
 ######################################################################
-# Package routines for QNAP_Vsock.
+# Package routines for QNAP_LXD_VM.
 #
 # The modules, QEMU shim and UEFI firmware are all handled by the shared
-# helper in shared/qnap-vsock.sh, which the service program also calls.
+# helper in shared/qnap-lxd-vm.sh, which the service program also calls.
 ######################################################################
 
-QPKG_NAME="QNAP_Vsock"
+QPKG_NAME="QNAP_LXD_VM"
 
 # QTS runs these routines with the package's paths in the environment. Only fall
 # back to the config file when they are not set: during an install, Install_Path
@@ -16,12 +16,12 @@ QPKG_ROOT=${QPKG_ROOT:-${QPKG_DIR:-$(/sbin/getcfg "$QPKG_NAME" Install_Path -f /
 # qbuild flattens shared/ into the package root, and while installing, the
 # working directory is the directory the files were extracted to, so the helper
 # is reachable relative to it as well.
-vsock_helper() {
+vm_helper() {
     for candidate in \
-        "$QPKG_ROOT/qnap-vsock.sh" \
-        "$QPKG_ROOT/shared/qnap-vsock.sh" \
-        ./qnap-vsock.sh \
-        ./shared/qnap-vsock.sh
+        "$QPKG_ROOT/qnap-lxd-vm.sh" \
+        "$QPKG_ROOT/shared/qnap-lxd-vm.sh" \
+        ./qnap-lxd-vm.sh \
+        ./shared/qnap-lxd-vm.sh
     do
         if [ -x "$candidate" ]; then
             printf '%s' "$candidate"
@@ -29,7 +29,7 @@ vsock_helper() {
         fi
     done
 
-    printf '%s/qnap-vsock.sh' "$QPKG_ROOT"
+    printf '%s/qnap-lxd-vm.sh' "$QPKG_ROOT"
 }
 
 pkg_pre_install() {
@@ -40,8 +40,8 @@ pkg_pre_install() {
 # yet; the service program checks again when the package starts, which is where
 # it matters.
 pkg_install() {
-    if [ ! -x "$(vsock_helper)" ]; then
-        echo "qnap-vsock: helper not found while installing; it will be looked up when the package starts" >&2
+    if [ ! -x "$(vm_helper)" ]; then
+        echo "qnap-lxd-vm: helper not found while installing; it will be looked up when the package starts" >&2
     fi
 
     return 0
@@ -54,16 +54,16 @@ pkg_install() {
 # rewriting that file. See the README for what that means in practice and for
 # the opt-in helper that does it if you want it.
 pkg_post_install() {
-    if ! QNAP_VSOCK_PREFIX="$QPKG_ROOT" "$(vsock_helper)" install; then
-        echo "qnap-vsock: failed to load vsock support, see /var/lib/qnap-vsock/qnap-vsock.log" >&2
+    if ! QNAP_LXD_VM_PREFIX="$QPKG_ROOT" "$(vm_helper)" install; then
+        echo "qnap-lxd-vm: failed to load vsock support, see /var/lib/qnap-lxd-vm/qnap-lxd-vm.log" >&2
     fi
 
     return 0
 }
 
 pkg_pre_remove() {
-    if [ -x "$(vsock_helper)" ]; then
-        QNAP_VSOCK_PREFIX="$QPKG_ROOT" "$(vsock_helper)" uninstall
+    if [ -x "$(vm_helper)" ]; then
+        QNAP_LXD_VM_PREFIX="$QPKG_ROOT" "$(vm_helper)" uninstall
     fi
 
     return 0

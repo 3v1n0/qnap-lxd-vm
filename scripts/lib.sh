@@ -55,4 +55,4 @@ kernel_arch() {
 }
 
 # host tool: run a command inside the build container image.
-BUILD_IMAGE=${BUILD_IMAGE:-localhost/qnap-vsock-builder:20.04}
+BUILD_IMAGE=${BUILD_IMAGE:-localhost/qnap-lxd-vm-builder:20.04}
