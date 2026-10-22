@@ -1,0 +1,181 @@
+name: Build and release
+
+# Every build produces the QPKG and the tarball the NAS needs. Pushing to main
+# refreshes a rolling beta release with them; pushing a v-tag cuts a stable
+# release. Pull requests only get the build, so nobody releases from a PR.
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build the artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      MODEL: TS-X53II
+      # Manual cache buster. The base images are pinned by *tag* (ubuntu:20.04
+      # &co), so a distro update publishes new layers under the same tag and
+      # cached images would keep serving the old ones: change this number to
+      # force everything derived from the images (images, apt state, binaries)
+      # to rebuild from scratch. The GPL downloads stay cached: they are
+      # version-pinned tarballs, not distro content.
+      CACHE_TAG: "0"
+      # GitHub's runners live in Azure, so its mirror is the fast one for the
+      # apt-get inside the images. Empty means the container's own default.
+      UBUNTU_MIRROR: http://azure.archive.ubuntu.com/ubuntu
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      # The build drives everything through podman (modules, QEMU, qbuild).
+      - name: Install podman
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman
+
+      # Rootful podman keeps images in /var/lib/containers by default. Point it
+      # into build/ so the images this build creates (two toolchains, the ovmf
+      # package) are cached and restored like everything else; the per-step
+      # guards skip whatever comes back intact.
+      - name: Point podman storage into the build tree
+        run: |
+          # build/ is created by the runner user, so the build scripts can
+          # mkdir into it; only the podman graph root itself is root-owned.
+          mkdir -p "$GITHUB_WORKSPACE/build"
+          sudo mkdir -p "$GITHUB_WORKSPACE/build/podman-graph"
+          # runner-owned, so restoring the cache can write into it (podman runs
+          # as root and does not care about the owner)
+          sudo chown "$(id -u):$(id -g)" "$GITHUB_WORKSPACE/build/podman-graph"
+          printf '%s\n' \
+              '[storage]' \
+              'driver = "overlay"' \
+              "graphroot = \"$GITHUB_WORKSPACE/build/podman-graph\"" \
+              'runroot = "/tmp/podman-run"' \
+              | sudo tee /etc/containers/storage.conf
+
+      # The GPL downloads (~1.6 GB) are the biggest non-computational cost.
+      # Keyed on the pinned versions (scripts/versions.sh) only: script
+      # refactorings keep them, a changed QTS_GPL release invalidates them.
+      # The build- fallback reuses whatever the pre-split caches stored
+      # (build/src/gpl included).
+      - name: Restore the GPL downloads
+        uses: actions/cache@v6
+        with:
+          path: build/src/gpl
+          key: gpl-${{ hashFiles('scripts/versions.sh') }}
+          restore-keys: |
+            gpl-
+            build-
+
+      # Container images and the binaries/firmware/datadir they produce.
+      # The key is the bump value (a manual cache buster, e.g. after a distro
+      # update publishes new layers under the same ubuntu: tag), the pinned
+      # versions, and the Containerfiles themselves - never their callers.
+      # Bump-scoped on purpose: a force-update must not resurrect the previous
+      # bump's images.
+      - name: Restore the container images and built outputs
+        uses: actions/cache@v6
+        with:
+          path: |
+            build/podman-graph
+            build/bin
+            build/firmware
+            build/qemu-datadir
+          key: images-b${{ env.CACHE_TAG }}-${{ hashFiles('scripts/versions.sh', 'containers/**') }}
+          restore-keys: |
+            images-b${{ env.CACHE_TAG }}-
+
+      - name: Build
+        run: ./build.sh
+
+      # Podman's graph internals are root-owned and root-permissioned; hand
+      # build/ back to the runner user so the post-job cache save can read it.
+      - name: Hand the build tree back to the runner
+        run: sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE/build"
+
+      - name: Check the packaging
+        run: bash tests/test-packaging.sh
+
+      - name: Store the artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: qnap-lxd-vm
+          path: |
+            out/*.qpkg
+            out/*.tar.gz
+          if-no-files-found: error
+
+  beta:
+    name: Beta release (main)
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Fetch the artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: qnap-lxd-vm
+          path: dist
+
+      # "beta" is a rolling tag: its assets are replaced on every push, so it
+      # always has the newest build without filling the releases list.
+      - name: Publish or refresh the beta release
+        run: |
+          if gh release view beta --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              gh release edit beta --repo "$GITHUB_REPOSITORY" --prerelease --target "$GITHUB_SHA"
+          else
+              gh release create beta --repo "$GITHUB_REPOSITORY" \
+                  --prerelease --title "Beta builds" --target "$GITHUB_SHA" \
+                  --notes "Automated beta build of main. The assets here are replaced on every push; for a stable, versioned set of files, use the tagged releases."
+          fi
+          gh release upload beta dist/* --repo "$GITHUB_REPOSITORY" --clobber
+
+  release:
+    name: Stable release (tag)
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Assert the tag matches the package version
+        run: |
+          ver=$(sed -n 's/^QPKG_VER="\([^"]*\)".*/\1/p' qpkg/qpkg.cfg)
+          tag=${GITHUB_REF_NAME#v}
+          if [ "$ver" != "$tag" ]; then
+              echo "qpkg.cfg says QPKG_VER=$ver but the tag is v$tag" >&2
+              echo "Bump QPKG_VER in qpkg/qpkg.cfg and tag again (e.g. git tag v$ver)." >&2
+              exit 1
+          fi
+
+      - name: Fetch the artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: qnap-lxd-vm
+          path: dist
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.qpkg
+            dist/*.tar.gz
+          generate_release_notes: true
