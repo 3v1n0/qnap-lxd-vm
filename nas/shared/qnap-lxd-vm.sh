@@ -5,7 +5,7 @@
 # Shared by the QPKG service program and by the plain install.sh, so there is
 # only one implementation of the load/verify logic.
 #
-# Usage: qnap-vsock.sh <action>
+# Usage: qnap-lxd-vm.sh <action>
 #
 #   install       shim + firmware + load, and say so if the running LXD is stale
 #   uninstall     unload the modules and drop the shim
@@ -18,7 +18,7 @@
 #
 # Layout it expects (both the QPKG and the tarball use it):
 #
-#   <prefix>/shared/qnap-vsock.sh
+#   <prefix>/shared/qnap-lxd-vm.sh
 #   <prefix>/modules/<kernel release>/*.ko
 #   <prefix>/firmware/OVMF_*.fd
 #
@@ -34,7 +34,7 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 # actually holds the modules and firmware.
 resolve_prefix() {
     local cand
-    for cand in ${QNAP_VSOCK_PREFIX:-} "$SCRIPT_DIR/.." "$SCRIPT_DIR" "$SCRIPT_DIR/../.."; do
+    for cand in ${QNAP_LXD_VM_PREFIX:-} "$SCRIPT_DIR/.." "$SCRIPT_DIR" "$SCRIPT_DIR/../.."; do
         [ -n "$cand" ] || continue
         [ -d "$cand/modules" ] && { (cd "$cand" && pwd); return 0; }
     done
@@ -43,14 +43,14 @@ resolve_prefix() {
 
 PREFIX=$(resolve_prefix)
 
-MODULES_DIR=${QNAP_VSOCK_MODULES:-$PREFIX/modules/$(uname -r)}
-FIRMWARE_DIR=${QNAP_VSOCK_FIRMWARE:-$PREFIX/firmware}
-STATE_DIR=${QNAP_VSOCK_STATE:-/var/lib/qnap-vsock}
-LOG_FILE=${QNAP_VSOCK_LOG:-$STATE_DIR/qnap-vsock.log}
+MODULES_DIR=${QNAP_LXD_VM_MODULES:-$PREFIX/modules/$(uname -r)}
+FIRMWARE_DIR=${QNAP_LXD_VM_FIRMWARE:-$PREFIX/firmware}
+STATE_DIR=${QNAP_LXD_VM_STATE:-/var/lib/qnap-lxd-vm}
+LOG_FILE=${QNAP_LXD_VM_LOG:-$STATE_DIR/qnap-lxd-vm.log}
 
 # LXD looks these up itself; do not invent paths for it.
 OVMF_DIR=${LXD_OVMF_PATH:-/usr/share/OVMF}
-BIN_DIR=${QNAP_VSOCK_BIN_DIR:-/usr/local/bin}
+BIN_DIR=${QNAP_LXD_VM_BIN_DIR:-/usr/local/bin}
 
 # LXD looks qemu up as qemu-system-<arch>, which is what uname -m reports on
 # both x86_64 and arm64 QNAP models.
@@ -61,12 +61,12 @@ MODULE_ORDER="vsock vmw_vsock_virtio_transport_common vhost_vsock"
 
 mkdir -p "$STATE_DIR" 2>/dev/null || STATE_DIR=/tmp
 
-# Site-specific overrides (see the QNAP_VSOCK_* variables above).
-CONFIG_FILE=${QNAP_VSOCK_CONFIG:-$STATE_DIR/config}
+# Site-specific overrides (see the QNAP_LXD_VM_* variables above).
+CONFIG_FILE=${QNAP_LXD_VM_CONFIG:-$STATE_DIR/config}
 [ -f "$CONFIG_FILE" ] && . "$CONFIG_FILE"
 
-log() { printf '[qnap-vsock] %s\n' "$*"; printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG_FILE" 2>/dev/null; }
-warn() { printf '[qnap-vsock] WARNING: %s\n' "$*" >&2; printf '[%s] WARNING: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG_FILE" 2>/dev/null; }
+log() { printf '[qnap-lxd-vm] %s\n' "$*"; printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG_FILE" 2>/dev/null; }
+warn() { printf '[qnap-lxd-vm] WARNING: %s\n' "$*" >&2; printf '[%s] WARNING: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$LOG_FILE" 2>/dev/null; }
 die() { warn "$*"; exit 1; }
 
 kver() { uname -r; }
@@ -347,7 +347,7 @@ process_start_after_boot() {
     local ticks hz
     ticks=$(read_start_ticks "$1")
     [ -n "$ticks" ] || return 1
-    hz=${QNAP_VSOCK_CLK_TCK:-$(getconf CLK_TCK 2>/dev/null || echo 100)}
+    hz=${QNAP_LXD_VM_CLK_TCK:-$(getconf CLK_TCK 2>/dev/null || echo 100)}
     awk -v ticks="$ticks" -v hz="$hz" 'BEGIN { printf "%d", ticks / hz }'
 }
 

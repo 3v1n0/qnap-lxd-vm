@@ -7,7 +7,7 @@
 set -eu
 
 PREFIX=$(cd "$(dirname "$0")" && pwd)
-HELPER="$PREFIX/shared/qnap-vsock.sh"
+HELPER="$PREFIX/shared/qnap-lxd-vm.sh"
 
 [ "$(id -u)" = 0 ] || { echo "run me as root" >&2; exit 1; }
 

@@ -8,12 +8,16 @@ REPO_DIR=${REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}
 
 # Nothing in this repository hardcodes the kernel release: the build reads it
 # back from the QNAP kernel tree (scripts/kernel-release.sh) and the NAS side
-# derives it from uname -r, then cross-checks the two.
-QTS_GPL_DEFAULT=${QTS_GPL_DEFAULT:-5.2.3.20250218}
-KERNEL_MAJOR_DEFAULT=${KERNEL_MAJOR_DEFAULT:-5.10}
-# The model whose kernel_cfg configures the tree; the one the repository is
-# built and verified against, and a sensible default for other TS-x53 models.
-MODEL_DEFAULT=${MODEL_DEFAULT:-TS-X53II}
+# derives it from uname -r, then cross-checks the two. version.sh holds the
+# pins that *do* determine the outputs (and are the CI cache keys).
+. "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/versions.sh"
+
+QTS_GPL_DEFAULT=$QTS_GPL
+KERNEL_MAJOR_DEFAULT=$KERNEL_MAJOR
+MODEL_DEFAULT=$MODEL
+QEMU_VERSION_DEFAULT=$QEMU_VERSION
+OVMF_UBUNTU_RELEASE_DEFAULT=$OVMF_UBUNTU_RELEASE
+BUILDER_UBUNTU_DEFAULT=$BUILDER_UBUNTU
 
 log() { printf '==> %s\n' "$*" >&2; }
 warn() { printf '!!! %s\n' "$*" >&2; }
@@ -59,4 +63,4 @@ kernel_arch() {
 UBUNTU_MIRROR=${UBUNTU_MIRROR:-}
 
 # host tool: run a command inside the build container image.
-BUILD_IMAGE=${BUILD_IMAGE:-localhost/qnap-vsock-builder:$BUILDER_UBUNTU}
+BUILD_IMAGE=${BUILD_IMAGE:-localhost/qnap-lxd-vm-builder:$BUILDER_UBUNTU}

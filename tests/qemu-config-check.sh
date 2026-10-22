@@ -198,7 +198,7 @@ command("qmp_capabilities")
 # set, and points a block device at /dev/fdset/<id>. Note the open flags: no
 # O_DIRECT - while the block device below asks QEMU for exactly that.
 disk_fd = os.open(disk, os.O_RDWR)
-message = json.dumps({"execute": "add-fd", "arguments": {"fdset-id": 0, "opaque": "qnap-vsock-check"}}) + "\n"
+message = json.dumps({"execute": "add-fd", "arguments": {"fdset-id": 0, "opaque": "qnap-lxd-vm-check"}}) + "\n"
 sock.sendmsg([message.encode()], [(socket.SOL_SOCKET, socket.SCM_RIGHTS, array.array("i", [disk_fd]))])
 result = read_message()
 if "error" in result:

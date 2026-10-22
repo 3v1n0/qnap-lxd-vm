@@ -40,7 +40,7 @@ datadir="$REPO_DIR/build/qemu-datadir"
 [ -d "$datadir" ] || die "no QEMU data directory in $datadir (run scripts/25-make-tools.sh)"
 
 out="$REPO_DIR/out"
-qpkg_root="$out/qpkg-src/QNAP_Vsock"
+qpkg_root="$out/qpkg-src/QNAP_LXD_VM"
 
 log "assembling QPKG source in $qpkg_root"
 rm -rf "$out/qpkg-src"
@@ -50,7 +50,7 @@ mkdir -p "$qpkg_root/shared"
 # (which are flattened into the installed package root), so everything we ship
 # has to live under shared/ in the source tree.
 cp -a "$REPO_DIR/qpkg/." "$qpkg_root/"
-cp "$REPO_DIR/nas/shared/qnap-vsock.sh" "$qpkg_root/shared/"
+cp "$REPO_DIR/nas/shared/qnap-lxd-vm.sh" "$qpkg_root/shared/"
 
 mkdir -p "$qpkg_root/shared/modules/$KERNEL_RELEASE"
 cp "$mods"/*.ko "$qpkg_root/shared/modules/$KERNEL_RELEASE/"
@@ -70,8 +70,8 @@ cp "$wrapper" "$qpkg_root/shared/bin/qemu-system-x86_64"
 cp "$tools_dir/qemu-system-x86_64" "$qpkg_root/shared/libexec/"
 cp -r "$datadir"/* "$qpkg_root/shared/share/qemu/"
 
-chmod +x "$qpkg_root/shared/qnap-vsock.sh" \
-         "$qpkg_root/shared/qnap-vsock-service.sh"
+chmod +x "$qpkg_root/shared/qnap-lxd-vm.sh" \
+         "$qpkg_root/shared/qnap-lxd-vm-service.sh"
 chmod 755 "$qpkg_root/shared/bin/"* "$qpkg_root/shared/libexec/"*
 
 if ! sudo podman image exists "$BUILD_IMAGE" 2>/dev/null; then
@@ -85,7 +85,7 @@ sudo podman run --rm \
     --user "$(id -u):$(id -g)" \
     -e HOME=/tmp -e TMPDIR=/tmp \
     -v "$out":/out \
-    -w /out/qpkg-src/QNAP_Vsock \
+    -w /out/qpkg-src/QNAP_LXD_VM \
     "$BUILD_IMAGE" \
     qbuild
 
@@ -107,14 +107,14 @@ log "built $final ($(stat -c %s "$final") bytes)"
 
 # Plain tarball for the path without App Center: unpack it on the NAS and run
 # install.sh from inside it.
-stage="$out/tarball/qnap-vsock"
+stage="$out/tarball/qnap-lxd-vm"
 rm -rf "$out/tarball"
 mkdir -p "$stage/shared" "$stage/autorun" \
          "$stage/modules/$KERNEL_RELEASE" "$stage/firmware" \
          "$stage/bin" "$stage/libexec" "$stage/share/qemu"
 
 cp "$REPO_DIR/nas/install.sh" "$REPO_DIR/nas/uninstall.sh" "$stage/"
-cp "$REPO_DIR/nas/shared/qnap-vsock.sh" "$stage/shared/"
+cp "$REPO_DIR/nas/shared/qnap-lxd-vm.sh" "$stage/shared/"
 cp "$REPO_DIR/nas/autorun/autorun.sh" "$stage/autorun/"
 cp "$mods"/*.ko "$stage/modules/$KERNEL_RELEASE/"
 cp -aL "$firmware"/*.fd "$stage/firmware/"
@@ -127,10 +127,10 @@ cp "$tools_dir/qemu-system-x86_64" "$stage/libexec/"
 cp -r "$datadir"/* "$stage/share/qemu/"
 chmod 755 "$stage/bin/"* "$stage/libexec/"*
 
-chmod +x "$stage/install.sh" "$stage/uninstall.sh" "$stage/shared/qnap-vsock.sh" "$stage/autorun/autorun.sh"
+chmod +x "$stage/install.sh" "$stage/uninstall.sh" "$stage/shared/qnap-lxd-vm.sh" "$stage/autorun/autorun.sh"
 
-tarball="$out/qnap-vsock-$KERNEL_RELEASE.tar.gz"
-tar -czf "$tarball" -C "$out/tarball" qnap-vsock
+tarball="$out/qnap-lxd-vm-$KERNEL_RELEASE.tar.gz"
+tar -czf "$tarball" -C "$out/tarball" qnap-lxd-vm
 log "built $tarball ($(stat -c %s "$tarball") bytes)"
 log "install with:"
 log "  scp $final admin@nas:/share/Public/"

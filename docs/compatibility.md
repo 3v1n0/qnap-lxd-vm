@@ -257,7 +257,7 @@ installing, and on any boot where Container Station's daemon got there first,
 ```sh
 # what the NAS would see: every check LXD makes, every tool it may run, and
 # whether the running daemon predates the modules
-sudo ./shared/qnap-vsock.sh preflight
+sudo ./shared/qnap-lxd-vm.sh preflight
 
 # the config LXD writes, plus the device_add calls it makes afterwards,
 # against the emulator this project builds - for any config from
