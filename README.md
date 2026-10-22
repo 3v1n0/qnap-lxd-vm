@@ -560,3 +560,13 @@ tests/                   local checks, no NAS needed
 ```
 
 `build/` and `out/` are generated and not tracked.
+
+## License
+
+The files in this repository are GPLv3; see [LICENSE](LICENSE).
+
+The vsock kernel modules that ship in the package are a different case: they are
+built from QNAP's own GPL-2.0 kernel source drop and remain under the GPLv2 of
+that source, as the kernel's license requires. The QEMU,
+`virtfs-proxy-helper`, OVMF and `qemu-img` binaries carry their upstream
+licenses.
